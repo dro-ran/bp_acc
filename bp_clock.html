@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>BP_Clock</title>
+    <style>
+        #clock {
+            top: 0;
+            left: 0;
+        }
+
+        #pip_button {
+            /* margin-top: 310px; */
+            display: flex;
+            padding: 10px 90px;
+            text-align: center;
+        }
+
+        #tw_link {
+            font-size: 10pt;
+            position: fixed;
+            left: 0;
+            bottom: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 実際のclock描画 -->
+    <canvas id="clock" width="300" height="300"></canvas>
+    <!-- PiP用にcanvasをミラーするvideo 実際の表示はいらないのでhidden -->
+    <video hidden id="clock_v" width="300" height="300"></video>
+    <!-- PiP用のボタン -->
+    <input type="button" id="pip_button" value="PiPでポップアウト">
+    <!-- 宣伝 -->
+    <a id="tw_link" href="https://twitter.com/dro_ran_bp">@dro_ran_bp</a>
+
+    <script>
+        function to_two_digits(val){
+            /* 二桁のstringにする */
+            return ("00" + val).slice(-2);
+        }
+
+        function to_canvas_arc_rad(deg) {
+            /* canvas arc上では90度右回転してるイメージなので90度分余計に動かす */
+            return (deg - 90) * Math.PI / 180;
+        }
+
+        function get_raid_time(cur_date) {
+            const monday_raid_time = [1, 14, 18, 22];
+            const normal_raid_time = [14, 18, 22];
+            const saturday_raid_time = [8, 12, 16, 20];
+            const sunday_raid_time = [1, 8, 12, 16, 20];
+
+            var is_raid_time = false;
+            var left_hour;
+            var left_min;
+            var left_sec;
+            var raid_time_arr;
+            var next_raid_time_arr;
+
+            /* 曜日によって使う配列を選ぶ */
+            switch (cur_date.getDay()) {
+                case 0:
+                    raid_time_arr = sunday_raid_time;
+                    next_raid_time_arr = monday_raid_time;
+                    break;
+                case 1:
+                    raid_time_arr = monday_raid_time;
+                    next_raid_time_arr = normal_raid_time;
+                    break;
+                case 2:
+                case 3:
+                case 4:
+                    raid_time_arr = normal_raid_time;
+                    next_raid_time_arr = normal_raid_time;
+                    break;
+                case 5:
+                    raid_time_arr = normal_raid_time;
+                    next_raid_time_arr = saturday_raid_time;
+                    break;
+                case 6:
+                    raid_time_arr = saturday_raid_time;
+                    next_raid_time_arr = sunday_raid_time;
+                    break;
+                default:
+                    /* ありえないケースだけど一応置いとく */
+                    raid_time_arr = normal_raid_time;
+                    next_raid_time_arr = normal_raid_time;
+                    break;
+            }
+
+            /* 次のレイド時間に当たる時刻を取得する */
+            const next_raid_hour = raid_time_arr.reduce((a, b) => {
+                if (a == cur_date.getHours()) {
+                    is_raid_time = true;
+                    return a;
+                } else if (b == cur_date.getHours()) {
+                    is_raid_time = true;
+                    return b;
+                } else if (a > cur_date.getHours()) {
+                    is_raid_time = false;
+                    return a;
+                }  else if (b > cur_date.getHours()) {
+                    is_raid_time = false;
+                    return b;
+                } else {
+                    is_raid_time = false;
+                    return b;
+                }
+            });
+
+            if (is_raid_time) {
+                left_hour = 0;
+            } else if ((next_raid_hour - cur_date.getHours() - 1) < 0) {
+                /* 日付またいで次のレイドがある場合 */
+                left_hour = 23 - cur_date.getHours() + next_raid_time_arr[0];
+            } else {
+                left_hour = next_raid_hour - cur_date.getHours() - 1;
+            }
+            /* 0分0秒スタートなのでここは考える必要なし */
+            left_min = 59 - cur_date.getMinutes();
+            left_sec = 59 - cur_date.getSeconds();
+
+            return [is_raid_time, left_hour, left_min, left_sec];
+        }
+
+        function get_reg_time(cur_date) {
+            const base_date = new Date(cur_date);
+            const end_date = new Date(cur_date);
+
+            var is_special_time_area = false;
+            var is_night = false;
+            var left_min = 0;
+            var left_min = 0;
+            var half_day_sec = 1500;
+
+            /* 時間の起点を9:12:10:00にする */
+            base_date.setHours(9);
+            base_date.setMinutes(12);
+            base_date.setSeconds(10);
+            base_date.setMilliseconds(0);
+
+            /* 時間の終点を8:57:10:00にする */
+            end_date.setHours(8);
+            end_date.setMinutes(57);
+            end_date.setSeconds(10);
+            end_date.setMilliseconds(0);
+
+            /* 0 - 8:57:10:00は開始時が1日前 */
+            if (cur_date.getTime() < end_date.getTime()) {
+                base_date.setDate(base_date.getDate() - 1);
+            }
+
+            /* 8:57:10 - 9:12:10は特殊なので扱いを変える */
+            if (cur_date.getTime() >= end_date.getTime()) {
+                if (cur_date.getTime() < base_date.getTime()) {
+                    is_special_time_area = true;
+                }
+            }
+
+            if (is_special_time_area) {
+                const cyc_ela_date = new Date(cur_date.getTime() - end_date.getTime());
+                half_day_sec = 900; // 15分
+                is_night = true;    // このタイミングは常に夜
+                /* 現サイクルの経過時間 */
+                left_min = 14 - cyc_ela_date.getMinutes();
+                left_sec = 59 - cyc_ela_date.getSeconds();
+            } else {
+                var time_cicle = 0;
+                const ela_msec = cur_date.getTime() - base_date.getTime();  // 1日の始まりからどれだけ経過したか
+                half_day_sec = 1500;    // 25分
+                time_cicle = Math.floor(ela_msec / (half_day_sec * 1000));
+                is_night = time_cicle % 2;
+
+                /* 現サイクルの開始時間 */
+                const cyc_start_date = new Date(time_cicle * half_day_sec * 1000 + base_date.getTime());
+                /* 現サイクルの経過時間 */
+                const cyc_ela_date = new Date(cur_date.getTime() - cyc_start_date.getTime());
+
+                /* 現サイクルの残り時間 */
+                left_min = 24 - cyc_ela_date.getMinutes();
+                left_sec = 59 - cyc_ela_date.getSeconds();
+            }
+
+            return [half_day_sec, is_night, left_min, left_sec];
+        }
+
+        function upd_clock() {
+            const cur_date = new Date();
+            var time_emoji = "❓"
+
+            /* 一旦現タイムゾーンから見てUTC+0にしてからJST(UTC+9)に変換する */
+            cur_date.setTime(cur_date.getTime() + cur_date.getTimezoneOffset() * 60 * 1000);
+            cur_date.setTime(cur_date.getTime() + 540 * 60 * 1000);
+
+            /* debug */
+            // cur_date.setHours(17);
+            // cur_date.setMinutes(50);
+            // cur_date.setSeconds(9);
+            // cur_date.setMilliseconds(0);
+
+            /* 昼夜と現在のサイクル残り時間と1サイクルあたり時間を取得 */
+            [half_day_sec, is_night, left_min, left_sec] = get_reg_time(cur_date);
+            /* レイド中かどうかと残り時間を取得 */
+            [is_raid_time, raid_left_hour, raid_left_min, raid_left_sec] = get_raid_time(cur_date);
+
+            /* 表示用二桁埋め */
+            const left_time_str = to_two_digits(left_min) + ":" + to_two_digits(left_sec);
+            const raid_left_time_str = to_two_digits(raid_left_hour) + ":" + to_two_digits(raid_left_min) + ":" + to_two_digits(raid_left_sec);
+            const esp_sec = half_day_sec - (left_min * 60 + left_sec);
+            const half_day_deg = (esp_sec % half_day_sec / half_day_sec * 360);
+
+            if (is_night) {
+                time_emoji = "🌙"
+            } else {
+                time_emoji = "🌞"
+            }
+
+            /* ページタイトルにサイクル残り時間を書く */
+            document.title = time_emoji + ":" + left_time_str;
+
+            /* canvas描画 */
+            const canvas = document.querySelector('#clock');
+            ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'rgb(0, 0, 0)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = "white";
+            ctx.textBaseline = "middle";
+            ctx.textAlign = "center";
+            ctx.font = "68px sans-serif";
+            ctx.fillText(time_emoji, 150, 110);
+
+            ctx.font = "bold 26px sans-serif";
+            ctx.fillText(left_time_str, 150, 170);
+
+            ctx.font = "bold 16px sans-serif";
+            if (is_raid_time) {
+                ctx.fillText("レイド中:" + raid_left_time_str, 150, 200);
+            } else {
+                ctx.fillText("レイドまで:" + raid_left_time_str, 150, 200);
+            }
+
+            ctx.beginPath();
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 18;
+            ctx.arc(150, 150, 120, to_canvas_arc_rad(0), to_canvas_arc_rad(half_day_deg), false);
+            ctx.stroke();
+
+            setTimeout(upd_clock, 1000);
+        }
+
+        function view_init() {
+            const canvas = document.querySelector('#clock');
+            const video = document.querySelector('#clock_v');
+
+            /* canvas上の表示をそのままvideoに送る */
+            video.srcObject = canvas.captureStream();
+            video.muted = true; // 自動再生に必要らしいがなくても動作するっぽい
+            video.play();
+        }
+
+        function pip_init() {
+            const pip_button = document.querySelector('#pip_button');
+            const video = document.querySelector('#clock_v');
+            pip_button.addEventListener('click', function () {
+                video.requestPictureInPicture();
+            });
+        }
+
+        function main() {
+            view_init();
+            pip_init();
+            upd_clock();
+        }
+
+        main();
+    </script>
+</body>
+
+</html>
