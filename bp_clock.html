@@ -195,12 +195,6 @@
             cur_date.setTime(cur_date.getTime() + cur_date.getTimezoneOffset() * 60 * 1000);
             cur_date.setTime(cur_date.getTime() + 540 * 60 * 1000);
 
-            /* debug */
-            // cur_date.setHours(17);
-            // cur_date.setMinutes(50);
-            // cur_date.setSeconds(9);
-            // cur_date.setMilliseconds(0);
-
             /* 昼夜と現在のサイクル残り時間と1サイクルあたり時間を取得 */
             [half_day_sec, is_night, left_min, left_sec] = get_reg_time(cur_date);
             /* レイド中かどうかと残り時間を取得 */
@@ -235,13 +229,16 @@
             ctx.font = "68px sans-serif";
             ctx.fillText(time_emoji, 150, 110);
 
+            ctx.fillStyle = "white";
             ctx.font = "bold 26px sans-serif";
             ctx.fillText(left_time_str, 150, 170);
 
             ctx.font = "bold 16px sans-serif";
             if (is_raid_time) {
+                ctx.fillStyle = "red";
                 ctx.fillText("レイド中:" + raid_left_time_str, 150, 200);
             } else {
+                ctx.fillStyle = "white";
                 ctx.fillText("レイドまで:" + raid_left_time_str, 150, 200);
             }
 
