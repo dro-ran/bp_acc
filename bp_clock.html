@@ -136,15 +136,15 @@
             var left_min = 0;
             var half_day_sec = 1500;
 
-            /* 時間の起点を9:22:10:00にする */
+            /* 時間の起点 */
             base_date.setHours(9);
-            base_date.setMinutes(22);
+            base_date.setMinutes(42);
             base_date.setSeconds(10);
             base_date.setMilliseconds(0);
 
-            /* 時間の終点を9:07:10:00にする */
+            /* 時間の終点 */
             end_date.setHours(9);
-            end_date.setMinutes(7);
+            end_date.setMinutes(27);
             end_date.setSeconds(10);
             end_date.setMilliseconds(0);
 
@@ -153,7 +153,7 @@
                 base_date.setDate(base_date.getDate() - 1);
             }
 
-            /* 8:57:10 - 9:12:10は特殊なので扱いを変える */
+            /* 起点終点間の15分は特殊なので扱いを変える */
             if (cur_date.getTime() >= end_date.getTime()) {
                 if (cur_date.getTime() < base_date.getTime()) {
                     is_special_time_area = true;
