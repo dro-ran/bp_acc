@@ -127,64 +127,30 @@
         }
 
         function get_reg_time(cur_date) {
-            const base_date = new Date(cur_date);
-            const end_date = new Date(cur_date);
-
-            var is_special_time_area = false;
             var is_night = false;
             var left_min = 0;
             var left_min = 0;
-            var half_day_sec = 1500;
 
-            /* 時間の起点 */
-            base_date.setHours(9);
-            base_date.setMinutes(42);
-            base_date.setSeconds(10);
-            base_date.setMilliseconds(0);
+            /* unittimeでの一番最初のサイクル開始に当たる時刻を作る */
+            const base_date = new Date(1030000);
+            /* 最初のサイクルスタートから数えた現在のサイクル数 1500000ms: 25分 */
+            var cur_cycle = Math.floor((cur_date.getTime() - base_date.getTime()) / 1500000);
+            /* 現サイクルの開始時間 */
+            const cycle_start_date = new Date((cur_cycle * 1500000) + base_date.getTime());
+            /* 現サイクルの経過時間 */
+            const cycle_ela_date = new Date(cur_date.getTime() - cycle_start_date.getTime());
 
-            /* 時間の終点 */
-            end_date.setHours(9);
-            end_date.setMinutes(27);
-            end_date.setSeconds(10);
-            end_date.setMilliseconds(0);
-
-            /* 0 - 8:57:10:00は開始時が1日前 */
-            if (cur_date.getTime() < end_date.getTime()) {
-                base_date.setDate(base_date.getDate() - 1);
-            }
-
-            /* 起点終点間の15分は特殊なので扱いを変える */
-            if (cur_date.getTime() >= end_date.getTime()) {
-                if (cur_date.getTime() < base_date.getTime()) {
-                    is_special_time_area = true;
-                }
-            }
-
-            if (is_special_time_area) {
-                const cyc_ela_date = new Date(cur_date.getTime() - end_date.getTime());
-                half_day_sec = 900; // 15分
-                is_night = true;    // このタイミングは常に夜
-                /* 現サイクルの経過時間 */
-                left_min = 14 - cyc_ela_date.getMinutes();
-                left_sec = 59 - cyc_ela_date.getSeconds();
+            if (cur_cycle % 2) {
+                is_night = false;
             } else {
-                var time_cicle = 0;
-                const ela_msec = cur_date.getTime() - base_date.getTime();  // 1日の始まりからどれだけ経過したか
-                half_day_sec = 1500;    // 25分
-                time_cicle = Math.floor(ela_msec / (half_day_sec * 1000));
-                is_night = time_cicle % 2;
-
-                /* 現サイクルの開始時間 */
-                const cyc_start_date = new Date(time_cicle * half_day_sec * 1000 + base_date.getTime());
-                /* 現サイクルの経過時間 */
-                const cyc_ela_date = new Date(cur_date.getTime() - cyc_start_date.getTime());
-
-                /* 現サイクルの残り時間 */
-                left_min = 24 - cyc_ela_date.getMinutes();
-                left_sec = 59 - cyc_ela_date.getSeconds();
+                is_night = true;
             }
+            /* 現サイクルの残り時間 */
+            left_min = 24 - cycle_ela_date.getMinutes();
+            left_sec = 59 - cycle_ela_date.getSeconds();
 
-            return [half_day_sec, is_night, left_min, left_sec];
+            /* 現仕様では1サイクル25分固定 1500sec: 25分 */
+            return [1500, is_night, left_min, left_sec];
         }
 
         function upd_clock() {
